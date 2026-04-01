@@ -1,240 +1,303 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>极简账本 Pro</title>
-    
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5501/5501375.png">
-    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/5501/5501375.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="紫金账本">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root { --brand-color: #8936F7; }
-        body { 
-            background-color: #F8F7FF; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .brand-bg { background-color: var(--brand-color); }
-        .brand-text { color: var(--brand-color); }
-        .glass-card { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); }
-        .chart-container { height: 180px; width: 100%; position: relative; }
-        input, select { outline: none !important; }
-        /* 隐藏滚动条但保留滚动功能 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-    </style>
-</head>
-<body class="pb-24">
-    <div class="max-w-md mx-auto px-5 pt-6 space-y-6">
-        
-        <div class="brand-bg rounded-[2.5rem] p-7 text-white shadow-2xl shadow-purple-200">
-            <div class="flex justify-between items-center mb-6">
-                <select id="time-range" onchange="updateUI()" class="bg-white/20 text-xs font-bold rounded-full px-3 py-1 border-none outline-none">
-                    <option value="day">今日</option>
-                    <option value="month" selected>本月</option>
-                    <option value="year">年度</option>
-                </select>
-                <div class="text-[10px] tracking-widest opacity-60 uppercase font-black" id="display-date">STATISTICS</div>
-            </div>
+<style>
+:root { --accent: #1a7a5e; --accent-light: #e8f5ef; --accent-mid: #2ecc91; --danger: #e05252; --danger-light: #fdeaea; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-size: 15px; }
+.app { max-width: 680px; margin: 0 auto; padding: 1rem 0 3rem; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.header h1 { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+.month-nav { display: flex; align-items: center; gap: 8px; }
+.month-nav button { background: none; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 4px 10px; font-size: 13px; cursor: pointer; color: var(--color-text-primary); }
+.month-nav button:hover { background: var(--color-background-secondary); }
+.month-label { font-size: 14px; font-weight: 500; min-width: 80px; text-align: center; color: var(--color-text-primary); }
+.summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+.summary-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 14px; }
+.summary-card .label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.summary-card .amount { font-size: 20px; font-weight: 500; }
+.income-val { color: #1a7a5e; }
+.expense-val { color: #e05252; }
+.balance-val { color: var(--color-text-primary); }
+.chart-wrap { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px; margin-bottom: 1.25rem; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.chart-title { font-size: 13px; color: var(--color-text-secondary); }
+.chart-legend { display: flex; gap: 12px; font-size: 12px; color: var(--color-text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+.add-section { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px; margin-bottom: 1.25rem; }
+.add-section h2 { font-size: 14px; font-weight: 500; margin-bottom: 12px; color: var(--color-text-primary); }
+.form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+.form-row.full { grid-template-columns: 1fr; }
+.form-group label { display: block; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.form-group input, .form-group select { width: 100%; padding: 7px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 14px; background: var(--color-background-secondary); color: var(--color-text-primary); outline: none; }
+.form-group input:focus, .form-group select:focus { border-color: #1a7a5e; }
+.type-toggle { display: flex; gap: 0; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); overflow: hidden; }
+.type-btn { flex: 1; padding: 7px; font-size: 13px; cursor: pointer; border: none; background: var(--color-background-secondary); color: var(--color-text-secondary); transition: all .15s; }
+.type-btn.active.income { background: #e8f5ef; color: #1a7a5e; font-weight: 500; }
+.type-btn.active.expense { background: #fdeaea; color: #e05252; font-weight: 500; }
+.add-btn { width: 100%; padding: 9px; background: #1a7a5e; color: #fff; border: none; border-radius: var(--border-radius-md); font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 2px; }
+.add-btn:hover { background: #15624c; }
+.list-section h2 { font-size: 14px; font-weight: 500; margin-bottom: 10px; color: var(--color-text-primary); }
+.group-date { font-size: 12px; color: var(--color-text-secondary); padding: 6px 0 4px; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 2px; }
+.tx-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.tx-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.tx-icon.income { background: #e8f5ef; }
+.tx-icon.expense { background: #fdeaea; }
+.tx-info { flex: 1; min-width: 0; }
+.tx-name { font-size: 14px; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-cat { font-size: 12px; color: var(--color-text-secondary); }
+.tx-right { text-align: right; flex-shrink: 0; }
+.tx-amount { font-size: 15px; font-weight: 500; }
+.tx-amount.income { color: #1a7a5e; }
+.tx-amount.expense { color: #e05252; }
+.tx-date-small { font-size: 11px; color: var(--color-text-secondary); }
+.del-btn { background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-size: 14px; padding: 4px; opacity: 0.5; }
+.del-btn:hover { opacity: 1; color: #e05252; }
+.empty { text-align: center; padding: 2rem 0; color: var(--color-text-secondary); font-size: 14px; }
+.filter-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-btn { padding: 5px 12px; border: 0.5px solid var(--color-border-secondary); border-radius: 20px; font-size: 12px; cursor: pointer; background: var(--color-background-secondary); color: var(--color-text-secondary); }
+.filter-btn.active { background: #1a7a5e; color: #fff; border-color: #1a7a5e; }
+</style>
 
-            <div class="space-y-1 mb-6 text-center">
-                <p class="text-xs opacity-70">结余金额 (CNY)</p>
-                <h2 id="total-balance" class="text-4xl font-black tracking-tight">¥0.00</h2>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4 mb-2">
-                <div class="glass-card rounded-2xl p-3">
-                    <p class="text-[10px] opacity-70 mb-1">总收入</p>
-                    <p id="total-inc" class="text-sm font-bold text-green-300">¥0</p>
-                </div>
-                <div class="glass-card rounded-2xl p-3">
-                    <p class="text-[10px] opacity-70 mb-1">总支出</p>
-                    <p id="total-exp" class="text-sm font-bold text-red-300">¥0</p>
-                </div>
-            </div>
-
-            <div class="chart-container pt-4">
-                <canvas id="expenseChart"></canvas>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-3xl p-5 shadow-sm border border-purple-50">
-            <form id="transaction-form" class="space-y-4">
-                <div class="flex gap-3">
-                    <input type="date" id="date" class="flex-1 bg-gray-50 rounded-xl p-3 text-xs font-medium text-gray-600">
-                    <select id="category" class="flex-1 bg-gray-50 rounded-xl p-3 text-xs font-medium text-gray-600">
-                        <optgroup label="餐饮">
-                            <option value="早饭">🥣 早饭</option>
-                            <option value="午饭">🍱 午饭</option>
-                            <option value="晚饭">🍜 晚饭</option>
-                            <option value="水果">🍎 水果</option>
-                            <option value="饮品">🥤 饮品/奶茶</option>
-                        </optgroup>
-                        <optgroup label="日常">
-                            <option value="日用品">🧻 日用品</option>
-                            <option value="服饰">👕 服饰</option>
-                            <option value="交通">🚗 交通</option>
-                            <option value="工资">💰 工资收入</option>
-                        </optgroup>
-                    </select>
-                </div>
-                <div class="flex gap-3">
-                    <input type="text" id="text" placeholder="备注内容" class="flex-[1.5] bg-gray-50 rounded-xl p-3 text-xs">
-                    <input type="number" id="amount" step="0.01" placeholder="金额" required class="flex-1 bg-gray-50 rounded-xl p-3 text-xs font-bold brand-text">
-                </div>
-                <button class="w-full brand-bg text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-purple-100 active:scale-[0.98] transition-all">
-                    确认记账
-                </button>
-            </form>
-        </div>
-
-        <div class="space-y-4">
-            <h3 class="text-xs font-black text-gray-400 ml-2 tracking-widest">TRANSACTION HISTORY</h3>
-            <div id="history-container" class="space-y-3"></div>
-        </div>
+<div class="app">
+  <div class="header">
+    <h1>记账本</h1>
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">&#8249;</button>
+      <span class="month-label" id="monthLabel"></span>
+      <button onclick="changeMonth(1)">&#8250;</button>
     </div>
+  </div>
 
-    <script>
-        let transactions = JSON.parse(localStorage.getItem('pro_tracker_v4')) || [];
-        let myChart = null;
-        document.getElementById('date').valueAsDate = new Date();
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="label">收入</div>
+      <div class="amount income-val" id="totalIncome">¥0</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">支出</div>
+      <div class="amount expense-val" id="totalExpense">¥0</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">结余</div>
+      <div class="amount balance-val" id="totalBalance">¥0</div>
+    </div>
+  </div>
 
-        function updateUI() {
-            const range = document.getElementById('time-range').value;
-            const now = new Date();
-            
-            const filtered = transactions.filter(t => {
-                const d = new Date(t.date);
-                if (range === 'day') return d.toDateString() === now.toDateString();
-                if (range === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                if (range === 'year') return d.getFullYear() === now.getFullYear();
-            });
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <span class="chart-title">月度收支趋势（近6个月）</span>
+      <div class="chart-legend">
+        <span><span class="legend-dot" style="background:#2ecc91"></span>收入</span>
+        <span><span class="legend-dot" style="background:#e05252"></span>支出</span>
+      </div>
+    </div>
+    <div style="position:relative;height:160px;"><canvas id="trendChart"></canvas></div>
+  </div>
 
-            const inc = filtered.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-            const exp = filtered.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0);
-            
-            document.getElementById('total-balance').innerText = `¥${(inc + exp).toFixed(2)}`;
-            document.getElementById('total-inc').innerText = `¥${inc.toFixed(2)}`;
-            document.getElementById('total-exp').innerText = `¥${Math.abs(exp).toFixed(2)}`;
+  <div class="add-section">
+    <h2>添加记录</h2>
+    <div class="type-toggle" style="margin-bottom:10px;">
+      <button class="type-btn active expense" id="typeExpense" onclick="setType('expense')">支出</button>
+      <button class="type-btn income" id="typeIncome" onclick="setType('income')">收入</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>金额 (¥)</label>
+        <input type="number" id="amount" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>分类</label>
+        <select id="category"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>备注</label>
+        <input type="text" id="note" placeholder="可选备注">
+      </div>
+      <div class="form-group">
+        <label>日期</label>
+        <input type="date" id="txDate">
+      </div>
+    </div>
+    <button class="add-btn" onclick="addTx()">+ 添加</button>
+  </div>
 
-            const catData = {};
-            filtered.filter(t => t.amount < 0).forEach(t => {
-                catData[t.category] = (catData[t.category] || 0) + Math.abs(t.amount);
-            });
+  <div class="list-section">
+    <h2>收支明细</h2>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setFilter('all',this)">全部</button>
+      <button class="filter-btn" onclick="setFilter('expense',this)">支出</button>
+      <button class="filter-btn" onclick="setFilter('income',this)">收入</button>
+    </div>
+    <div id="txList"></div>
+  </div>
+</div>
 
-            renderChart(catData);
-            renderList();
-        }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const CATS = {
+  expense: ['餐饮','购物','交通','住房','娱乐','医疗','教育','其他'],
+  income: ['工资','奖金','投资','兼职','其他']
+};
+const ICONS = {
+  餐饮:'🍜',购物:'🛍',交通:'🚇',住房:'🏠',娱乐:'🎮',医疗:'💊',教育:'📚',
+  工资:'💰',奖金:'🎁',投资:'📈',兼职:'💼',其他:'📌'
+};
 
-        function renderChart(data) {
-            const ctx = document.getElementById('expenseChart').getContext('2d');
-            if (myChart) myChart.destroy();
-            
-            const hasData = Object.keys(data).length > 0;
+let transactions = JSON.parse(localStorage.getItem('ledger_txs') || '[]');
+let currentType = 'expense';
+let currentFilter = 'all';
+let currentMonth = new Date();
+let chart = null;
 
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: hasData ? Object.keys(data) : ['暂无支出'],
-                    datasets: [{
-                        data: hasData ? Object.values(data) : [0],
-                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                        borderRadius: 10,
-                        barThickness: 15
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { 
-                        y: { display: false },
-                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.8)', font: { size: 9, weight: 'bold' } } }
-                    },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        }
+function save() { try { localStorage.setItem('ledger_txs', JSON.stringify(transactions)); } catch(e){} }
 
-        function renderList() {
-            const container = document.getElementById('history-container');
-            container.innerHTML = '';
-            const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-            const groups = sorted.reduce((acc, t) => {
-                if (!acc[t.date]) acc[t.date] = [];
-                acc[t.date].push(t);
-                return acc;
-            }, {});
+function fmtMoney(n) { return '¥' + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
-            for (const date in groups) {
-                const section = document.createElement('div');
-                section.innerHTML = `
-                    <div class="bg-white rounded-[1.5rem] shadow-sm overflow-hidden mb-3">
-                        <div class="bg-gray-50/50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                            <span class="text-[10px] font-black text-gray-400">${date}</span>
-                        </div>
-                        <div class="divide-y divide-gray-50">
-                            ${groups[date].map(t => `
-                                <div class="p-4 flex justify-between items-center active:bg-gray-50 transition-colors">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-lg">
-                                            ${getEmoji(t.category)}
-                                        </div>
-                                        <div>
-                                            <div class="text-xs font-bold text-gray-800">${t.category}</div>
-                                            <div class="text-[10px] text-gray-400">${t.text || '未填写备注'}</div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-4">
-                                        <span class="text-sm font-black ${t.amount > 0 ? 'text-green-500' : 'text-gray-900'}">
-                                            ${t.amount > 0 ? '+' : ''}${t.amount}
-                                        </span>
-                                        <button onclick="deleteItem(${t.id})" class="text-gray-300 hover:text-red-400">&times;</button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                container.appendChild(section);
-            }
-        }
+function setType(t) {
+  currentType = t;
+  document.getElementById('typeExpense').className = 'type-btn' + (t==='expense'?' active expense':'');
+  document.getElementById('typeIncome').className = 'type-btn' + (t==='income'?' active income':'');
+  updateCats();
+}
 
-        function getEmoji(cat) {
-            const map = {'早饭':'🥣','午饭':'🍱','晚饭':'🍜','水果':'🍎','饮品/奶茶':'🥤','日用品':'🧻','服饰':'👕','交通':'🚗','工资':'💰','其他':'❓'};
-            return map[cat] || '🏷️';
-        }
+function updateCats() {
+  const sel = document.getElementById('category');
+  sel.innerHTML = CATS[currentType].map(c=>`<option>${c}</option>`).join('');
+}
 
-        document.getElementById('transaction-form').onsubmit = (e) => {
-            e.preventDefault();
-            const amt = parseFloat(document.getElementById('amount').value);
-            const cat = document.getElementById('category').value;
-            const newItem = {
-                id: Date.now(),
-                date: document.getElementById('date').value,
-                category: cat,
-                text: document.getElementById('text').value,
-                amount: (cat !== '工资' && amt > 0) ? -amt : amt
-            };
-            transactions.push(newItem);
-            localStorage.setItem('pro_tracker_v4', JSON.stringify(transactions));
-            updateUI();
-            e.target.reset();
-            document.getElementById('date').valueAsDate = new Date();
-        };
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
 
-        window.deleteItem = (id) => {
-            if(confirm('确定要删除这笔记录吗？')) {
-                transactions = transactions.filter(t => t.id !== id);
-                localStorage.setItem('pro_tracker_v4', JSON.stringify(transactions));
-                updateUI();
-            }
-        };
+function changeMonth(d) {
+  currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + d, 1);
+  render();
+}
 
-        updateUI();
-    </script>
-</body>
-</html>
+function monthKey(date) {
+  const d = new Date(date);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function addTx() {
+  const amt = parseFloat(document.getElementById('amount').value);
+  const cat = document.getElementById('category').value;
+  const note = document.getElementById('note').value.trim();
+  const date = document.getElementById('txDate').value;
+  if (!amt || amt <= 0) { alert('请输入有效金额'); return; }
+  if (!date) { alert('请选择日期'); return; }
+  transactions.unshift({ id: Date.now(), type: currentType, amount: amt, category: cat, note, date });
+  save();
+  document.getElementById('amount').value = '';
+  document.getElementById('note').value = '';
+  render();
+}
+
+function deleteTx(id) {
+  transactions = transactions.filter(t=>t.id!==id);
+  save();
+  render();
+}
+
+function render() {
+  const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
+  document.getElementById('monthLabel').textContent = y + '年' + (m+1) + '月';
+  const mk = monthKey(currentMonth);
+  const monthTxs = transactions.filter(t=>t.date.startsWith(mk));
+  const inc = monthTxs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp = monthTxs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  document.getElementById('totalIncome').textContent = fmtMoney(inc);
+  document.getElementById('totalExpense').textContent = fmtMoney(exp);
+  const bal = inc - exp;
+  const balEl = document.getElementById('totalBalance');
+  balEl.textContent = fmtMoney(Math.abs(bal));
+  balEl.style.color = bal >= 0 ? '#1a7a5e' : '#e05252';
+  renderList();
+  renderChart();
+}
+
+function renderList() {
+  const mk = monthKey(currentMonth);
+  let txs = transactions.filter(t=>t.date.startsWith(mk));
+  if (currentFilter !== 'all') txs = txs.filter(t=>t.type===currentFilter);
+  txs.sort((a,b)=>b.date.localeCompare(a.date));
+  const list = document.getElementById('txList');
+  if (!txs.length) { list.innerHTML = '<div class="empty">暂无记录</div>'; return; }
+  const groups = {};
+  txs.forEach(t=>{ (groups[t.date]=groups[t.date]||[]).push(t); });
+  list.innerHTML = Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{
+    const items = groups[date].map(t=>`
+      <div class="tx-item">
+        <div class="tx-icon ${t.type}">${ICONS[t.category]||'📌'}</div>
+        <div class="tx-info">
+          <div class="tx-name">${t.note||t.category}</div>
+          <div class="tx-cat">${t.category}</div>
+        </div>
+        <div class="tx-right">
+          <div class="tx-amount ${t.type}">${t.type==='income'?'+':'-'}${fmtMoney(t.amount)}</div>
+        </div>
+        <button class="del-btn" onclick="deleteTx(${t.id})" title="删除">✕</button>
+      </div>`).join('');
+    return `<div class="group-date">${date}</div>${items}`;
+  }).join('');
+}
+
+function renderChart() {
+  const months = [];
+  const incData = [], expData = [];
+  for (let i=5; i>=0; i--) {
+    const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth()-i, 1);
+    const mk = monthKey(d);
+    months.push((d.getMonth()+1)+'月');
+    const txs = transactions.filter(t=>t.date.startsWith(mk));
+    incData.push(+txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0).toFixed(2));
+    expData.push(+txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0).toFixed(2));
+  }
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        { label:'收入', data: incData, backgroundColor:'rgba(46,204,145,0.7)', borderRadius:4, barPercentage:0.5 },
+        { label:'支出', data: expData, backgroundColor:'rgba(224,82,82,0.7)', borderRadius:4, barPercentage:0.5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false } },
+      scales: {
+        x: { grid: { display:false }, ticks:{ font:{size:12} } },
+        y: { grid: { color:'rgba(128,128,128,0.1)' }, ticks:{ font:{size:11}, callback: v=>'¥'+v } }
+      }
+    }
+  });
+}
+
+function init() {
+  updateCats();
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('txDate').value = today;
+  if (!transactions.length) {
+    const now = new Date();
+    const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0');
+    const samples = [
+      {id:1,type:'income',amount:8000,category:'工资',note:'本月工资',date:`${y}-${m}-01`},
+      {id:2,type:'expense',amount:45.5,category:'餐饮',note:'午餐',date:`${y}-${m}-02`},
+      {id:3,type:'expense',amount:200,category:'购物',note:'超市采购',date:`${y}-${m}-03`},
+      {id:4,type:'expense',amount:30,category:'交通',note:'打车',date:`${y}-${m}-04`},
+      {id:5,type:'income',amount:500,category:'兼职',note:'周末兼职',date:`${y}-${m}-05`},
+    ];
+    transactions = samples;
+    save();
+  }
+  render();
+}
+
+init();
+</script>
