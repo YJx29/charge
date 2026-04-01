@@ -4,19 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>我的智能记账本</title>
+
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2933/2933116.png">
-
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2933/2933116.png">
-
     <meta name="apple-mobile-web-app-title" content="我的账本">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
-        /* 优化手机端点击体验 */
+        /* 优化手机端点击与布局 */
+        body { -webkit-tap-highlight-color: transparent; }
         button, select, input { touch-action: manipulation; }
-        .chart-container { position: relative; height: 200px; width: 100%; }
+        .chart-container { position: relative; height: 180px; width: 100%; }
+        /* 隐藏滚动条 */
+        ::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="bg-slate-50 pb-10">
@@ -58,20 +62,18 @@
                     <input type="number" id="amount" step="0.01" placeholder="金额" required class="flex-1 border-gray-200 border rounded-xl p-2 text-sm">
                 </div>
                 <button class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform">
-                    确认记录
+                    保存账单
                 </button>
             </form>
         </div>
 
-        <div id="history-container" class="space-y-3">
-            </div>
+        <div id="history-container" class="space-y-3"></div>
     </div>
 
     <script>
         let transactions = JSON.parse(localStorage.getItem('pro_tracker_v2')) || [];
         let myChart = null;
 
-        // 初始化日期
         document.getElementById('date').valueAsDate = new Date();
 
         function updateUI() {
@@ -86,10 +88,8 @@
                 const d = new Date(t.date);
                 return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
             });
-
             const income = monthData.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
             const expense = monthData.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0);
-
             document.getElementById('month-balance').innerText = `¥${(income + expense).toFixed(2)}`;
             document.getElementById('month-expense').innerText = `¥${Math.abs(expense).toFixed(2)}`;
             document.getElementById('month-label').innerText = `${now.getMonth() + 1}月结余`;
@@ -101,16 +101,12 @@
                 const d = new Date(t.date);
                 return d.getMonth() === now.getMonth() && d.amount < 0;
             });
-
             const categories = {};
             expenseData.forEach(t => {
                 categories[t.category] = (categories[t.category] || 0) + Math.abs(t.amount);
             });
-
             const ctx = document.getElementById('expenseChart').getContext('2d');
-            
-            if (myChart) myChart.destroy(); // 销毁旧图表防止重叠
-
+            if (myChart) myChart.destroy();
             myChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -118,16 +114,13 @@
                     datasets: [{
                         data: Object.values(categories),
                         backgroundColor: ['#fbbf24', '#f87171', '#60a5fa', '#34d399', '#a78bfa', '#fb923c'],
-                        borderWidth: 0,
-                        hoverOffset: 4
+                        borderWidth: 0
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right', labels: { color: '#ffffff', font: { size: 10 } } }
-                    }
+                    plugins: { legend: { position: 'right', labels: { color: '#ffffff', font: { size: 10 } } } }
                 }
             });
         }
@@ -170,13 +163,12 @@
         document.getElementById('transaction-form').onsubmit = (e) => {
             e.preventDefault();
             const amountVal = parseFloat(document.getElementById('amount').value);
-            // 简单逻辑：除了工资都视为支出（负数）
-            const finalAmount = (document.getElementById('category').value !== '工资' && amountVal > 0) ? -amountVal : amountVal;
-
+            const cat = document.getElementById('category').value;
+            const finalAmount = (cat !== '工资' && amountVal > 0) ? -amountVal : amountVal;
             const newItem = {
                 id: Date.now(),
                 date: document.getElementById('date').value,
-                category: document.getElementById('category').value,
+                category: cat,
                 text: document.getElementById('text').value,
                 amount: finalAmount
             };
